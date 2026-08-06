@@ -15,7 +15,7 @@ def test_query_weekly_metrics_returns_count_and_total_per_event():
         project=os.environ["BQ_BILLING_PROJECT"],
         credentials_path=os.environ["GOOGLE_APPLICATION_CREDENTIALS"],
     )
-    metrics = query_weekly_metrics(backend, _DATASET, ["level_start"], "20180501", "20180507")
+    metrics = query_weekly_metrics(backend, _DATASET, ["level_start"], "20180701", "20180707")
     count, total = metrics["level_start"]
     assert 0 <= count <= total
     assert total > 0

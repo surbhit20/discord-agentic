@@ -7,7 +7,15 @@ pytestmark = pytest.mark.live
 
 _SQL = (
     "SELECT COUNT(*) AS n FROM `firebase-public-project.analytics_153293282.events_*` "
-    "WHERE _TABLE_SUFFIX BETWEEN '20180501' AND '20180502'"
+    "WHERE _TABLE_SUFFIX BETWEEN '20180701' AND '20180702'"
+)
+
+# COUNT(*) alone can be resolved from table metadata with 0 bytes scanned;
+# dry_run needs a query that actually reads column data to report > 0 bytes.
+_SQL_WITH_COLUMN_SCAN = (
+    "SELECT COUNT(DISTINCT user_pseudo_id) AS n "
+    "FROM `firebase-public-project.analytics_153293282.events_*` "
+    "WHERE _TABLE_SUFFIX BETWEEN '20180701' AND '20180702'"
 )
 
 
@@ -21,7 +29,7 @@ def _backend():
 
 def test_dry_run_estimates_bytes_without_charge():
     backend = _backend()
-    assert backend.dry_run(_SQL) > 0
+    assert backend.dry_run(_SQL_WITH_COLUMN_SCAN) > 0
 
 
 def test_execute_returns_rows():
