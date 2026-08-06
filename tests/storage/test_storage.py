@@ -17,6 +17,17 @@ def test_digest_history_round_trip():
     assert last["metrics"]["tutorial_step_3"] == (780, 1000)
 
 
+def test_saving_the_same_week_twice_updates_instead_of_crashing():
+    # week_start is the PRIMARY KEY; re-running the digest job for the same week
+    # (e.g. a manual test run) must overwrite, not raise IntegrityError.
+    conn = _conn()
+    digest_history.save_digest(conn, {"tutorial_step_3": (780, 1000)}, "2026-08-03")
+    digest_history.save_digest(conn, {"tutorial_step_3": (800, 1000)}, "2026-08-03")
+    last = digest_history.load_last_digest(conn)
+    assert last["metrics"]["tutorial_step_3"] == (800, 1000)
+    assert conn.execute("SELECT COUNT(*) FROM digest_history").fetchone()[0] == 1
+
+
 def test_schema_cache_round_trip():
     conn = _conn()
     assert schema_cache.load_schema(conn) is None

@@ -4,7 +4,8 @@ import sqlite3
 
 def save_digest(conn: sqlite3.Connection, metrics: dict[str, tuple[int, int]], week_start: str) -> None:
     conn.execute(
-        "INSERT INTO digest_history (week_start, metrics_json) VALUES (?, ?)",
+        "INSERT INTO digest_history (week_start, metrics_json) VALUES (?, ?) "
+        "ON CONFLICT(week_start) DO UPDATE SET metrics_json = excluded.metrics_json",
         (week_start, json.dumps(metrics)),
     )
     conn.commit()
