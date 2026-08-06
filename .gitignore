@@ -6,3 +6,7 @@ __pycache__/
 venv/
 analystbot.db
 .superpowers/
+.env
+*-key.json
+service-account*.json
+credentials.json
