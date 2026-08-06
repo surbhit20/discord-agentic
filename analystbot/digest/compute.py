@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from analystbot.digest.significance import is_significant
+from analystbot.schema_funnels import find_funnel_pairs
 from analystbot.storage import digest_history
 
 
@@ -7,6 +8,29 @@ from analystbot.storage import digest_history
 class DigestResult:
     summary: str
     metrics: dict[str, float]
+
+
+def _worst_funnel_leak(current_metrics: dict[str, tuple[int, int]]) -> tuple[str, str, str, float] | None:
+    """The genuine funnel pair (stem, start_event, end_event) with the lowest completion
+    rate — i.e. of players who started, the smallest fraction who finished.
+
+    Deliberately restricted to detected start/end pairs rather than the raw participation
+    rate across every tracked event: that used to surface things like a rare marketing
+    event (`dynamic_link_first_open`) as the "worst leak" just because few players ever
+    fire it, which isn't a drop-off at all. When no genuine funnel pair is present in this
+    week's metrics, there is nothing honest to report — return None rather than falling
+    back to a misleading pick.
+    """
+    candidates = []
+    for stem, start_event, end_event in find_funnel_pairs(current_metrics.keys()):
+        start_count, _ = current_metrics[start_event]
+        end_count, _ = current_metrics[end_event]
+        if start_count == 0:
+            continue
+        candidates.append((stem, start_event, end_event, end_count / start_count))
+    if not candidates:
+        return None
+    return min(candidates, key=lambda c: c[3])
 
 
 def run_digest(conn, week_start: str, current_metrics: dict[str, tuple[int, int]]) -> DigestResult:
@@ -22,18 +46,19 @@ def run_digest(conn, week_start: str, current_metrics: dict[str, tuple[int, int]
 
     digest_history.save_digest(conn, current_metrics, week_start)
 
-    worst_name, (worst_count, worst_total) = min(
-        current_metrics.items(), key=lambda kv: kv[1][0] / kv[1][1] if kv[1][1] else 1.0
-    )
-
     lines = [f"Week of {week_start}:"]
     if moved:
         for name, prev_rate, rate in moved:
             lines.append(f"- {name} moved from {prev_rate:.0%} to {rate:.0%} (significant)")
     else:
         lines.append("- nothing moved significantly this week")
-    if worst_total:
-        lines.append(f"- worst leak: {worst_name} at {worst_count / worst_total:.0%}")
+
+    worst = _worst_funnel_leak(current_metrics)
+    if worst is not None:
+        stem, start_event, end_event, completion_rate = worst
+        lines.append(
+            f"- worst leak: {stem} — {start_event} → {end_event} at {completion_rate:.0%} completion"
+        )
 
     metrics = {name: (count / total if total else 0.0) for name, (count, total) in current_metrics.items()}
     return DigestResult(summary="\n".join(lines), metrics=metrics)
