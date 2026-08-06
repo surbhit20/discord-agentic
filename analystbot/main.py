@@ -240,7 +240,12 @@ def make_weekly_digest_job(bot, config: Config):
             await channel.send(result.summary)
         except Exception:
             logger.exception("weekly_digest_job failed")
-            channel = bot.get_channel(config_store.get_digest_channel(bot.conn) or 0)
+            try:
+                channel_id = config_store.get_digest_channel(bot.conn)
+                channel = bot.get_channel(channel_id) if channel_id is not None else None
+            except Exception:
+                logger.exception("could not resolve the digest channel to report the failure")
+                return
             if channel is not None:
                 await _safe_send(channel, _DIGEST_FAILURE)
 
