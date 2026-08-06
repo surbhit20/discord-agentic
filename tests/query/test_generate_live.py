@@ -46,3 +46,18 @@ def test_stated_preference_is_accepted_without_breaking_a_normal_match():
         "what's our retention like", FLOOD_IT_SCHEMA, [], ["always show D7, not D1"], _client()
     )
     assert result.outcome in (QuestionOutcome.MATCH, QuestionOutcome.REFUSAL)
+
+
+def test_message_stating_a_preference_is_captured_for_long_term_memory():
+    result = understand_and_generate(
+        "remember that I always want D7 retention, not D1", FLOOD_IT_SCHEMA, [], [], _client()
+    )
+    assert result.preference_to_remember is not None
+    assert "D7" in result.preference_to_remember
+
+
+def test_ordinary_question_states_no_preference_to_remember():
+    result = understand_and_generate(
+        "how many players started level 3", FLOOD_IT_SCHEMA, [], [], _client()
+    )
+    assert result.preference_to_remember is None

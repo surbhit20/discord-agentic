@@ -15,6 +15,10 @@ class QuestionResult:
     outcome: QuestionOutcome
     sql: str | None = None
     message: str | None = None
+    # Set when the message also states a durable preference to remember for this user
+    # ("always show me D7, not D1"). Independent of `outcome`: a message can both state
+    # a preference and ask an answerable question.
+    preference_to_remember: str | None = None
 
 
 _TOOL = {
@@ -28,6 +32,16 @@ _TOOL = {
             "message": {
                 "type": "string",
                 "description": "Refusal reason or clarifying question, required when outcome is refusal or clarify",
+            },
+            "preference_to_remember": {
+                "type": "string",
+                "description": (
+                    "Set this ONLY when the user is explicitly asking to be remembered on future "
+                    "questions (e.g. 'always show me D7, not D1', 'remember that I care about the "
+                    "tutorial funnel'). Restate it as a short standalone instruction. Leave it out "
+                    "for ordinary questions, one-off filters, or anything the user did not ask you "
+                    "to remember. Fill it in regardless of the outcome value."
+                ),
             },
         },
         "required": ["outcome"],
@@ -48,6 +62,8 @@ def understand_and_generate(
         "Decide: does this map to a plausible query against this schema (match), "
         "is it clearly unanswerable because the needed event/param doesn't exist (refusal), "
         "or is there no plausible mapping at all so you should ask for clarification (clarify)? "
+        "Also decide whether the message states a durable preference this user wants remembered "
+        "for future questions — if so, set preference_to_remember as well. "
         "Call answer_plan with your decision."
     )
     response = client.messages.create(
@@ -63,4 +79,5 @@ def understand_and_generate(
         outcome=QuestionOutcome(data["outcome"]),
         sql=data.get("sql"),
         message=data.get("message"),
+        preference_to_remember=data.get("preference_to_remember"),
     )

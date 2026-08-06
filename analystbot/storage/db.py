@@ -29,6 +29,12 @@ CREATE TABLE IF NOT EXISTS user_question_history (
     asked_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS pending_query (
+    thread_id INTEGER PRIMARY KEY,
+    question TEXT NOT NULL,
+    sql TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS thread_context (
     thread_id INTEGER NOT NULL,
     question TEXT NOT NULL,

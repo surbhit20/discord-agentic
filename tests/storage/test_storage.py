@@ -59,6 +59,25 @@ def test_user_memory_preferences_and_history():
     assert history[0]["answer"] == "38%"
 
 
+def test_pending_query_round_trip_and_clear():
+    conn = _conn()
+    assert threads.get_pending_query(conn, 42) is None
+    threads.save_pending_query(conn, 42, "how many players ever", "SELECT COUNT(*) FROM big")
+    assert threads.get_pending_query(conn, 42) == {
+        "question": "how many players ever",
+        "sql": "SELECT COUNT(*) FROM big",
+    }
+    threads.clear_pending_query(conn, 42)
+    assert threads.get_pending_query(conn, 42) is None
+
+
+def test_saving_a_second_pending_query_replaces_the_first():
+    conn = _conn()
+    threads.save_pending_query(conn, 42, "first", "SELECT 1")
+    threads.save_pending_query(conn, 42, "second", "SELECT 2")
+    assert threads.get_pending_query(conn, 42)["sql"] == "SELECT 2"
+
+
 def test_thread_context_round_trip():
     conn = _conn()
     assert threads.get_thread_context(conn, 999) == []
