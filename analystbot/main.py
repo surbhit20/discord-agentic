@@ -100,6 +100,7 @@ def build_bot(*, config: Config, conn, backend, anthropic_client) -> AnalystBot:
         return SimpleNamespace(
             backend=backend,
             schema=schema,
+            dataset_path=config.bq_dataset_path,
             anthropic_client=anthropic_client,
             cost_threshold_bytes=config.cost_threshold_bytes,
             conn=conn,

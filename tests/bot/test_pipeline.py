@@ -7,14 +7,19 @@ from analystbot.query.generate import QuestionResult, QuestionOutcome
 from analystbot.query.confidence import ConfidenceResult
 from analystbot.storage import db, digest_history, threads as thread_store, user_memory
 
+_DATASET_PATH = "firebase-public-project.analytics_153293282"
+
 
 @pytest.mark.asyncio
 async def test_refusal_short_circuits_before_sql_execution(monkeypatch):
     monkeypatch.setattr(
         pipeline.generate, "understand_and_generate",
-        lambda q, s, c, p, a: QuestionResult(outcome=QuestionOutcome.REFUSAL, message="you don't log session end"),
+        lambda q, s, c, p, d, a: QuestionResult(outcome=QuestionOutcome.REFUSAL, message="you don't log session end"),
     )
-    deps = SimpleNamespace(backend=MagicMock(), schema={}, anthropic_client=MagicMock(), cost_threshold_bytes=1000)
+    deps = SimpleNamespace(
+        backend=MagicMock(), schema={}, dataset_path=_DATASET_PATH,
+        anthropic_client=MagicMock(), cost_threshold_bytes=1000,
+    )
     reply, sql = await pipeline.answer_question("avg session length", 1, [], [], deps)
     assert "session end" in reply
     assert sql is None
@@ -25,9 +30,12 @@ async def test_refusal_short_circuits_before_sql_execution(monkeypatch):
 async def test_clarify_short_circuits(monkeypatch):
     monkeypatch.setattr(
         pipeline.generate, "understand_and_generate",
-        lambda q, s, c, p, a: QuestionResult(outcome=QuestionOutcome.CLARIFY, message="did you mean X or Y?"),
+        lambda q, s, c, p, d, a: QuestionResult(outcome=QuestionOutcome.CLARIFY, message="did you mean X or Y?"),
     )
-    deps = SimpleNamespace(backend=MagicMock(), schema={}, anthropic_client=MagicMock(), cost_threshold_bytes=1000)
+    deps = SimpleNamespace(
+        backend=MagicMock(), schema={}, dataset_path=_DATASET_PATH,
+        anthropic_client=MagicMock(), cost_threshold_bytes=1000,
+    )
     reply, sql = await pipeline.answer_question("vibe economy", 1, [], [], deps)
     assert "X or Y" in reply
     assert sql is None
@@ -37,11 +45,11 @@ async def test_clarify_short_circuits(monkeypatch):
 async def test_expensive_query_returns_cost_warning_without_executing(monkeypatch):
     monkeypatch.setattr(
         pipeline.generate, "understand_and_generate",
-        lambda q, s, c, p, a: QuestionResult(outcome=QuestionOutcome.MATCH, sql="SELECT 1"),
+        lambda q, s, c, p, d, a: QuestionResult(outcome=QuestionOutcome.MATCH, sql="SELECT 1"),
     )
     deps = SimpleNamespace(
         backend=MagicMock(dry_run=MagicMock(return_value=10_000_000_000)),
-        schema={}, anthropic_client=MagicMock(), cost_threshold_bytes=1000,
+        schema={}, dataset_path=_DATASET_PATH, anthropic_client=MagicMock(), cost_threshold_bytes=1000,
     )
     reply, sql = await pipeline.answer_question("how many players ever", 1, [], [], deps)
     assert "confirm" in reply
@@ -52,7 +60,7 @@ async def test_expensive_query_returns_cost_warning_without_executing(monkeypatc
 async def test_confident_safe_answer_has_no_caution(monkeypatch):
     monkeypatch.setattr(
         pipeline.generate, "understand_and_generate",
-        lambda q, s, c, p, a: QuestionResult(outcome=QuestionOutcome.MATCH, sql="SELECT COUNT(*) FROM x"),
+        lambda q, s, c, p, d, a: QuestionResult(outcome=QuestionOutcome.MATCH, sql="SELECT COUNT(*) FROM x"),
     )
     monkeypatch.setattr(pipeline, "check_cost", lambda backend, sql, threshold: (False, 10))
     monkeypatch.setattr(pipeline.confidence_mod, "score_confidence", lambda q, sql, c: ConfidenceResult(confident=True))
@@ -60,7 +68,7 @@ async def test_confident_safe_answer_has_no_caution(monkeypatch):
     monkeypatch.setattr(pipeline.answer_mod, "format_answer", lambda q, rows, note, c: "22% of players quit here.")
     deps = SimpleNamespace(
         backend=MagicMock(execute=MagicMock(return_value=[{"n": 220}])),
-        schema={}, anthropic_client=MagicMock(), cost_threshold_bytes=1000,
+        schema={}, dataset_path=_DATASET_PATH, anthropic_client=MagicMock(), cost_threshold_bytes=1000,
     )
     reply, sql = await pipeline.answer_question("where do players quit", 1, [], [], deps)
     assert reply == "22% of players quit here."
@@ -71,7 +79,7 @@ async def test_confident_safe_answer_has_no_caution(monkeypatch):
 async def test_low_confidence_answer_gets_caution_flag(monkeypatch):
     monkeypatch.setattr(
         pipeline.generate, "understand_and_generate",
-        lambda q, s, c, p, a: QuestionResult(outcome=QuestionOutcome.MATCH, sql="SELECT COUNT(*) FROM x"),
+        lambda q, s, c, p, d, a: QuestionResult(outcome=QuestionOutcome.MATCH, sql="SELECT COUNT(*) FROM x"),
     )
     monkeypatch.setattr(pipeline, "check_cost", lambda backend, sql, threshold: (False, 10))
     monkeypatch.setattr(
@@ -82,7 +90,7 @@ async def test_low_confidence_answer_gets_caution_flag(monkeypatch):
     monkeypatch.setattr(pipeline.answer_mod, "format_answer", lambda q, rows, note, c: "22% of players quit here.")
     deps = SimpleNamespace(
         backend=MagicMock(execute=MagicMock(return_value=[{"n": 220}])),
-        schema={}, anthropic_client=MagicMock(), cost_threshold_bytes=1000,
+        schema={}, dataset_path=_DATASET_PATH, anthropic_client=MagicMock(), cost_threshold_bytes=1000,
     )
     reply, sql = await pipeline.answer_question("where do players quit", 1, [], [], deps)
     assert "caution" in reply.lower()
@@ -99,6 +107,7 @@ def _deps(conn=None, **overrides):
     base = dict(
         backend=MagicMock(execute=MagicMock(return_value=[{"n": 220}])),
         schema={},
+        dataset_path=_DATASET_PATH,
         anthropic_client=MagicMock(),
         cost_threshold_bytes=1000,
         conn=conn,
@@ -124,7 +133,7 @@ def _stub_execution_path(monkeypatch, answer="22% of players quit here.", captur
 async def test_refusal_without_a_message_does_not_render_none(monkeypatch):
     monkeypatch.setattr(
         pipeline.generate, "understand_and_generate",
-        lambda q, s, c, p, a: QuestionResult(outcome=QuestionOutcome.REFUSAL),
+        lambda q, s, c, p, d, a: QuestionResult(outcome=QuestionOutcome.REFUSAL),
     )
     reply, sql = await pipeline.answer_question("avg session length", 1, [], [], _deps())
     assert "None" not in reply
@@ -135,7 +144,7 @@ async def test_refusal_without_a_message_does_not_render_none(monkeypatch):
 async def test_clarify_without_a_message_does_not_render_none(monkeypatch):
     monkeypatch.setattr(
         pipeline.generate, "understand_and_generate",
-        lambda q, s, c, p, a: QuestionResult(outcome=QuestionOutcome.CLARIFY),
+        lambda q, s, c, p, d, a: QuestionResult(outcome=QuestionOutcome.CLARIFY),
     )
     reply, sql = await pipeline.answer_question("vibe economy", 1, [], [], _deps())
     assert "None" not in reply
@@ -146,7 +155,7 @@ async def test_clarify_without_a_message_does_not_render_none(monkeypatch):
 async def test_stated_preference_is_written_to_user_memory(monkeypatch):
     monkeypatch.setattr(
         pipeline.generate, "understand_and_generate",
-        lambda q, s, c, p, a: QuestionResult(
+        lambda q, s, c, p, d, a: QuestionResult(
             outcome=QuestionOutcome.MATCH, sql="SELECT COUNT(*) FROM x",
             preference_to_remember="always show D7, not D1",
         ),
@@ -161,7 +170,7 @@ async def test_stated_preference_is_written_to_user_memory(monkeypatch):
 async def test_preference_is_remembered_even_when_the_question_is_refused(monkeypatch):
     monkeypatch.setattr(
         pipeline.generate, "understand_and_generate",
-        lambda q, s, c, p, a: QuestionResult(
+        lambda q, s, c, p, d, a: QuestionResult(
             outcome=QuestionOutcome.REFUSAL, message="you don't log session end",
             preference_to_remember="remember that I care about the tutorial funnel",
         ),
@@ -175,7 +184,7 @@ async def test_preference_is_remembered_even_when_the_question_is_refused(monkey
 async def test_no_preference_means_no_write(monkeypatch):
     monkeypatch.setattr(
         pipeline.generate, "understand_and_generate",
-        lambda q, s, c, p, a: QuestionResult(outcome=QuestionOutcome.MATCH, sql="SELECT COUNT(*) FROM x"),
+        lambda q, s, c, p, d, a: QuestionResult(outcome=QuestionOutcome.MATCH, sql="SELECT COUNT(*) FROM x"),
     )
     _stub_execution_path(monkeypatch)
     conn = _memory_conn()
@@ -187,7 +196,7 @@ async def test_no_preference_means_no_write(monkeypatch):
 async def test_two_group_result_passes_a_significance_note_to_answer_formatting(monkeypatch):
     monkeypatch.setattr(
         pipeline.generate, "understand_and_generate",
-        lambda q, s, c, p, a: QuestionResult(outcome=QuestionOutcome.MATCH, sql="SELECT 1"),
+        lambda q, s, c, p, d, a: QuestionResult(outcome=QuestionOutcome.MATCH, sql="SELECT 1"),
     )
     notes = []
     _stub_execution_path(monkeypatch, captured_note=notes)
@@ -205,7 +214,7 @@ async def test_two_group_result_passes_a_significance_note_to_answer_formatting(
 async def test_single_row_result_gets_no_significance_note(monkeypatch):
     monkeypatch.setattr(
         pipeline.generate, "understand_and_generate",
-        lambda q, s, c, p, a: QuestionResult(outcome=QuestionOutcome.MATCH, sql="SELECT 1"),
+        lambda q, s, c, p, d, a: QuestionResult(outcome=QuestionOutcome.MATCH, sql="SELECT 1"),
     )
     notes = []
     _stub_execution_path(monkeypatch, captured_note=notes)
@@ -217,7 +226,7 @@ async def test_single_row_result_gets_no_significance_note(monkeypatch):
 async def test_last_week_question_gets_the_cached_digest_as_context(monkeypatch):
     seen = {}
 
-    def _capture(question, schema, context, preferences, client):
+    def _capture(question, schema, context, preferences, dataset_path, client):
         seen["context"] = context
         return QuestionResult(outcome=QuestionOutcome.MATCH, sql="SELECT 1")
 
@@ -236,7 +245,7 @@ async def test_last_week_question_gets_the_cached_digest_as_context(monkeypatch)
 async def test_question_without_last_week_phrasing_skips_the_cached_digest(monkeypatch):
     seen = {}
 
-    def _capture(question, schema, context, preferences, client):
+    def _capture(question, schema, context, preferences, dataset_path, client):
         seen["context"] = context
         return QuestionResult(outcome=QuestionOutcome.MATCH, sql="SELECT 1")
 
@@ -252,7 +261,7 @@ async def test_question_without_last_week_phrasing_skips_the_cached_digest(monke
 async def test_cost_warning_parks_the_pending_query_for_the_thread(monkeypatch):
     monkeypatch.setattr(
         pipeline.generate, "understand_and_generate",
-        lambda q, s, c, p, a: QuestionResult(outcome=QuestionOutcome.MATCH, sql="SELECT COUNT(*) FROM big"),
+        lambda q, s, c, p, d, a: QuestionResult(outcome=QuestionOutcome.MATCH, sql="SELECT COUNT(*) FROM big"),
     )
     conn = _memory_conn()
     deps = _deps(conn, backend=MagicMock(dry_run=MagicMock(return_value=10_000_000_000)))

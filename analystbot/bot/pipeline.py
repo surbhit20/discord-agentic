@@ -90,7 +90,13 @@ async def answer_question(
 ) -> tuple[str, str | None]:
     full_context = context + _digest_context(question, deps)
     result = await asyncio.to_thread(
-        generate.understand_and_generate, question, deps.schema, full_context, preferences, deps.anthropic_client
+        generate.understand_and_generate,
+        question,
+        deps.schema,
+        full_context,
+        preferences,
+        deps.dataset_path,
+        deps.anthropic_client,
     )
     _remember_preference(result, user_id, deps)
 

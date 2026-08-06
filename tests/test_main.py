@@ -123,7 +123,7 @@ def harness(monkeypatch):
 
 
 def _stub_understanding(monkeypatch, sql="SELECT 1", outcome=QuestionOutcome.MATCH, seen=None):
-    def _understand(question, schema, context, preferences, client):
+    def _understand(question, schema, context, preferences, dataset_path, client):
         if seen is not None:
             seen.append({"question": question, "context": context, "schema": schema})
         return QuestionResult(outcome=outcome, sql=sql)

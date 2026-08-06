@@ -50,10 +50,16 @@ _TOOL = {
 
 
 def understand_and_generate(
-    question: str, schema: dict, context: list[dict], preferences: list[str], client: anthropic.Anthropic
+    question: str,
+    schema: dict,
+    context: list[dict],
+    preferences: list[str],
+    dataset_path: str,
+    client: anthropic.Anthropic,
 ) -> QuestionResult:
     context_text = "\n".join(f"Q: {t['question']}\nSQL: {t['sql']}\nA: {t['answer']}" for t in context)
     preferences_text = "\n".join(f"- {p}" for p in preferences)
+    table_ref = f"`{dataset_path}.events_*`"
     prompt = (
         f"Discovered BigQuery schema (event_name -> param keys):\n{json.dumps(schema['events'], indent=2)}\n\n"
         f"This user's stated preferences (apply as defaults unless the question says otherwise):\n{preferences_text or '(none)'}\n\n"
@@ -64,6 +70,9 @@ def understand_and_generate(
         "or is there no plausible mapping at all so you should ask for clarification (clarify)? "
         "Also decide whether the message states a durable preference this user wants remembered "
         "for future questions — if so, set preference_to_remember as well. "
+        f"If you generate SQL, the FROM clause must reference exactly {table_ref} — this is the "
+        "one and only real table; never invent, abbreviate, or guess a different project, "
+        "dataset, or table name, and never omit the project. "
         "Call answer_plan with your decision."
     )
     response = client.messages.create(
