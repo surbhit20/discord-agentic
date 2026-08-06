@@ -139,7 +139,7 @@ async def test_full_mention_onboard_confirm_question_followup_sequence(harness, 
     # 1. First mention: onboarding report, no digest channel yet.
     await bot.on_message(_mention_message("hey what can you do", channel=channel))
     report = channel.send.await_args.args[0]
-    assert "level_start" in report and "5000 players" in report
+    assert "level_start" in report and "5,000 players" in report
     assert schema_cache.load_schema(conn)["player_count"] == 5000
     assert config_store.get_digest_channel(conn) is None
 

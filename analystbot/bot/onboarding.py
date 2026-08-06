@@ -1,43 +1,11 @@
 import asyncio
 
 from analystbot.query.schema_discovery import discover_schema
+from analystbot.schema_funnels import AUTOMATIC_EVENTS_WITHOUT_COMPLETION, END_SUFFIXES, START_SUFFIXES
 from analystbot.storage import schema_cache
 
 
-# Suffixes that mark the opening of something that should also have a closing event.
-# Deliberately excludes "_open"/"_opened": that suffix is the one Firebase/GA4 uses for
-# automatic events with no completion concept at all (first_open, notification_open), so
-# treating it as a funnel-start suffix produced fabricated gaps for events that were never
-# a "start" of anything.
-_START_SUFFIXES = ("_start", "_started", "_begin", "_begun")
-# Suffixes that count as a closing event for a given stem.
-_END_SUFFIXES = (
-    "_complete", "_completed", "_end", "_ended", "_finish", "_finished",
-    "_success", "_succeeded", "_fail", "_failed", "_quit", "_abandon", "_abandoned", "_close", "_closed",
-)
 _ENGAGEMENT_EVENTS = ("session_end", "user_engagement", "app_remove", "screen_view")
-# Automatic Firebase/GA4 events that never have a "completion" counterpart, no matter what
-# they're named — belt-and-suspenders alongside dropping "_open" above, in case a future
-# automatic event happens to end in one of the suffixes above.
-_AUTOMATIC_EVENTS_WITHOUT_COMPLETION = frozenset(
-    {
-        "first_open",
-        "app_open",
-        "notification_open",
-        "notification_receive",
-        "notification_dismiss",
-        "app_remove",
-        "app_update",
-        "os_update",
-        "app_clear_data",
-        "app_exception",
-        "ad_impression",
-        "ad_click",
-        "ad_reward",
-        "screen_view",
-        "user_engagement",
-    }
-)
 _MAX_GAPS = 3
 
 
@@ -53,12 +21,12 @@ def find_schema_gaps(events: dict) -> list[str]:
     gaps: list[str] = []
 
     for name in sorted(names):
-        if name in _AUTOMATIC_EVENTS_WITHOUT_COMPLETION:
+        if name in AUTOMATIC_EVENTS_WITHOUT_COMPLETION:
             continue
-        stem = next((name[: -len(s)] for s in _START_SUFFIXES if name.endswith(s)), None)
+        stem = next((name[: -len(s)] for s in START_SUFFIXES if name.endswith(s)), None)
         if not stem:
             continue
-        if any(f"{stem}{end}" in names for end in _END_SUFFIXES):
+        if any(f"{stem}{end}" in names for end in END_SUFFIXES):
             continue
         if stem == "session":
             gaps.append(
@@ -80,21 +48,39 @@ def find_schema_gaps(events: dict) -> list[str]:
     return gaps[:_MAX_GAPS]
 
 
+def _format_date(yyyymmdd: str) -> str:
+    """`20180612` -> `2018-06-12`; passes through anything not in that exact shape."""
+    if len(yyyymmdd) == 8 and yyyymmdd.isdigit():
+        return f"{yyyymmdd[:4]}-{yyyymmdd[4:6]}-{yyyymmdd[6:8]}"
+    return yyyymmdd
+
+
 def build_onboarding_report(schema: dict) -> str:
     events = schema["events"]
     tracked = ", ".join(sorted(events.keys()))
     min_date, max_date = schema["date_range"]
+    player_count = schema["player_count"]
+
     lines = [
-        f"Tracking {len(events)} event types: {tracked}.",
-        f"Data covers {min_date} to {max_date}, {schema['player_count']} players.",
+        "**Setup complete — here's what I found**",
+        "",
+        f"**{player_count:,} players**, tracked from **{_format_date(min_date)}** to **{_format_date(max_date)}**.",
+        "",
+        f"**{len(events)} event types tracked:**",
+        f"```\n{tracked}\n```",
     ]
+
     gaps = find_schema_gaps(events)
     if gaps:
-        lines.append("Notable gaps:")
+        lines.append("")
+        lines.append("**⚠️ Notable gaps:**")
         lines.extend(f"- {gap}" for gap in gaps)
+
+    lines.append("")
     lines.append(
-        "Reply with `confirm` (mentioning me, since that's the only way I hear you outside my own "
-        "threads) to start using this data, or correct me if something looks wrong."
+        "**Next step:** reply with `confirm` (make sure to @-mention me, since that's the only way "
+        "I hear you outside my own threads) to start using this data, or tell me if something above "
+        "looks wrong."
     )
     return "\n".join(lines)
 

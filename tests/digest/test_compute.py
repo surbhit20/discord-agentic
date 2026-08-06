@@ -24,12 +24,44 @@ def test_second_run_flags_significant_movement():
     assert "significant" in result.summary
 
 
-def test_worst_leak_is_the_lowest_completion_rate():
+def test_worst_leak_is_the_lowest_completion_rate_among_genuine_funnel_pairs():
     conn = _conn()
     result = run_digest(
-        conn, "2026-08-03", {"tutorial_step_3": (780, 1000), "level_4_start": (690, 1000)}
+        conn,
+        "2026-08-03",
+        {
+            "level_3_start": (1000, 5000), "level_3_complete": (780, 5000),
+            "level_4_start": (1000, 5000), "level_4_complete": (690, 5000),
+        },
     )
-    assert "level_4_start" in result.summary
+    # level_3 completion rate 780/1000 = 78%, level_4 is 690/1000 = 69% — level_4 is worse.
+    assert "level_4" in result.summary
+    assert "69%" in result.summary
+    assert "worst leak" in result.summary
+
+
+def test_worst_leak_ignores_rare_non_funnel_events():
+    # Regression test: this used to rank "worst leak" by raw participation rate across
+    # every tracked event, so a rare marketing/system event that almost nobody ever
+    # triggers (not a funnel start/end pair at all) would win — caught during a live
+    # end-to-end run where `dynamic_link_first_open` was reported as the "worst leak".
+    conn = _conn()
+    result = run_digest(
+        conn,
+        "2026-08-03",
+        {
+            "level_3_start": (1000, 5000), "level_3_complete": (900, 5000),
+            "dynamic_link_first_open": (1, 5000),
+        },
+    )
+    assert "dynamic_link_first_open" not in result.summary
+    assert "level_3" in result.summary
+
+
+def test_no_worst_leak_line_when_no_genuine_funnel_pairs_exist():
+    conn = _conn()
+    result = run_digest(conn, "2026-08-03", {"screen_view": (900, 1000), "ad_reward": (10, 1000)})
+    assert "worst leak" not in result.summary
 
 
 def test_run_digest_persists_current_metrics_for_next_comparison():
