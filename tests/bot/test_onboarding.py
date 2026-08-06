@@ -67,3 +67,37 @@ def test_schema_with_no_detectable_gaps_reports_none():
 def test_at_most_three_gaps_are_reported():
     events = {f"thing{i}_start": [] for i in range(10)}
     assert len(find_schema_gaps(events)) == 3
+
+
+def test_first_open_is_not_flagged_as_a_gap():
+    # first_open fires once per install (automatic Firebase event) — it isn't the start
+    # of a funnel and has no "completion" concept, so it must never be reported as a gap.
+    gaps = find_schema_gaps({"first_open": [], "user_engagement": []})
+    assert not any("first_open" in gap for gap in gaps)
+
+
+def test_notification_open_is_not_flagged_as_a_gap():
+    # notification_open fires when a user taps a push notification — also automatic,
+    # also no completion concept.
+    gaps = find_schema_gaps({"notification_open": [], "user_engagement": []})
+    assert not any("notification_open" in gap for gap in gaps)
+
+
+def test_automatic_events_do_not_crowd_out_a_genuine_gap():
+    # first_open/notification_open sort alphabetically before level_start, so if they were
+    # (wrongly) treated as gaps they'd fill the 3-gap cap and hide the real one.
+    gaps = find_schema_gaps(
+        {
+            "first_open": [],
+            "notification_open": [],
+            "level_start": [],
+            "user_engagement": [],
+        }
+    )
+    assert any("level_start" in gap and "completion" in gap for gap in gaps)
+    assert not any("first_open" in gap or "notification_open" in gap for gap in gaps)
+
+
+def test_tutorial_start_without_completion_is_still_a_genuine_gap():
+    gaps = find_schema_gaps({"tutorial_start": [], "user_engagement": []})
+    assert any("tutorial_start" in gap and "completion" in gap for gap in gaps)

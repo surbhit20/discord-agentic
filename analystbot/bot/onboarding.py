@@ -5,13 +5,39 @@ from analystbot.storage import schema_cache
 
 
 # Suffixes that mark the opening of something that should also have a closing event.
-_START_SUFFIXES = ("_start", "_started", "_begin", "_begun", "_open", "_opened")
+# Deliberately excludes "_open"/"_opened": that suffix is the one Firebase/GA4 uses for
+# automatic events with no completion concept at all (first_open, notification_open), so
+# treating it as a funnel-start suffix produced fabricated gaps for events that were never
+# a "start" of anything.
+_START_SUFFIXES = ("_start", "_started", "_begin", "_begun")
 # Suffixes that count as a closing event for a given stem.
 _END_SUFFIXES = (
     "_complete", "_completed", "_end", "_ended", "_finish", "_finished",
     "_success", "_succeeded", "_fail", "_failed", "_quit", "_abandon", "_abandoned", "_close", "_closed",
 )
 _ENGAGEMENT_EVENTS = ("session_end", "user_engagement", "app_remove", "screen_view")
+# Automatic Firebase/GA4 events that never have a "completion" counterpart, no matter what
+# they're named — belt-and-suspenders alongside dropping "_open" above, in case a future
+# automatic event happens to end in one of the suffixes above.
+_AUTOMATIC_EVENTS_WITHOUT_COMPLETION = frozenset(
+    {
+        "first_open",
+        "app_open",
+        "notification_open",
+        "notification_receive",
+        "notification_dismiss",
+        "app_remove",
+        "app_update",
+        "os_update",
+        "app_clear_data",
+        "app_exception",
+        "ad_impression",
+        "ad_click",
+        "ad_reward",
+        "screen_view",
+        "user_engagement",
+    }
+)
 _MAX_GAPS = 3
 
 
@@ -27,6 +53,8 @@ def find_schema_gaps(events: dict) -> list[str]:
     gaps: list[str] = []
 
     for name in sorted(names):
+        if name in _AUTOMATIC_EVENTS_WITHOUT_COMPLETION:
+            continue
         stem = next((name[: -len(s)] for s in _START_SUFFIXES if name.endswith(s)), None)
         if not stem:
             continue
