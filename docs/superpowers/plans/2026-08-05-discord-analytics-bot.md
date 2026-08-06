@@ -1998,7 +1998,24 @@ Confirm the bot refuses (naming what's missing) for something like "what's our a
 
 - [ ] **Step 7: Trigger a digest run manually and confirm the post looks right**
 
-Temporarily call `weekly_digest_job()` directly (e.g. via a short one-off script or a Python REPL importing `analystbot.main.build_bot` and constructing the job body) instead of waiting for Monday; confirm the digest channel receives a summary with real numbers and a named worst leak.
+The entrypoint API changed during the final review's fix wave (`build_bot()` now requires injected `config`/`conn`/`backend`/`anthropic_client`; `build_bot_from_env()` is the env-var-driven constructor, and the digest job is now built via `make_weekly_digest_job(bot, config)` rather than a closure inside `main()`). Temporarily call the job directly instead of waiting for Monday, e.g.:
+
+```python
+from analystbot.main import build_bot_from_env, make_weekly_digest_job
+import asyncio
+
+bot, config = build_bot_from_env()
+job = make_weekly_digest_job(bot, config)
+
+@bot.event
+async def on_ready():
+    await job()
+    await bot.close()
+
+bot.run(config.discord_token)
+```
+
+Confirm the digest channel receives a summary with real numbers and a named worst leak.
 
 - [ ] **Step 8: Record the results**
 
