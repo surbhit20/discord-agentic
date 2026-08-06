@@ -41,6 +41,6 @@ class AnalystBot(discord.Client):
 
         await self.route_message(
             message, handlers,
-            is_bot_author=False, mentions_bot=mentions_bot,
+            is_bot_author=bool(getattr(message.author, "bot", False)), mentions_bot=mentions_bot,
             is_thread=is_thread, thread_started_by_bot=thread_started_by_bot,
         )
