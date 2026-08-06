@@ -13,6 +13,18 @@ from analystbot.digest.scheduler import start_scheduler
 from types import SimpleNamespace
 
 
+def _confirm_locks_in_schema(content: str, schema_cached: bool) -> bool:
+    """True only when the message is exactly "confirm" AND a schema has already been
+    discovered and cached for this guild.
+
+    Without the `schema_cached` check, a user's very first message being "@bot confirm"
+    would set the digest channel before `run_onboarding` ever ran, permanently routing
+    NEW_QUESTION away from onboarding and leaving `_deps()` stuck on its empty-schema
+    fallback forever (every question would look unanswerable against `{"events": {}}`).
+    """
+    return content.strip().lower() == "confirm" and schema_cached
+
+
 def build_bot() -> AnalystBot:
     config = load_config(dict(os.environ))
     conn = db.get_connection(config.db_path)
@@ -48,7 +60,8 @@ def build_bot() -> AnalystBot:
         user_memory.add_question_history(conn, message.author.id, message.content, reply)
 
     async def handle_onboarding(message: discord.Message) -> None:
-        if message.content.strip().lower() == "confirm":
+        schema_cached = schema_cache.load_schema(conn) is not None
+        if _confirm_locks_in_schema(message.content, schema_cached):
             config_store.set_digest_channel(conn, message.channel.id)
             await message.channel.send("Confirmed. I'll post the weekly digest here.")
         else:
@@ -85,7 +98,18 @@ def main() -> None:
         result = run_digest(bot.conn, today.isoformat(), current_metrics)
         await channel.send(result.summary)
 
-    start_scheduler(weekly_digest_job)
+    @bot.event
+    async def on_ready() -> None:
+        # AsyncIOScheduler must attach to a running event loop, and weekly_digest_job
+        # touches bot.conn (a thread-affine sqlite3.Connection) and the bot's own
+        # aiohttp session — both require running on this exact loop/thread. on_ready
+        # fires after bot.run() has started that loop, so this is the first safe point
+        # to start it. on_ready can fire again after a reconnect, so guard against
+        # scheduling the job a second time.
+        if not getattr(bot, "_scheduler_started", False):
+            bot._scheduler_started = True
+            start_scheduler(weekly_digest_job)
+
     bot.run(config.discord_token)
 
 
