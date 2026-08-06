@@ -31,7 +31,13 @@ _TOOL = {
             "sql": {"type": "string", "description": "BigQuery SQL, required when outcome is match"},
             "message": {
                 "type": "string",
-                "description": "Refusal reason or clarifying question, required when outcome is refusal or clarify",
+                "description": (
+                    "Refusal reason or clarifying question, required when outcome is refusal or "
+                    "clarify. When refusing a question that's off-topic for this bot (general "
+                    "knowledge, math, anything unrelated to this game's tracked data), say only "
+                    "that it's out of scope — never actually answer the off-topic question itself, "
+                    "even as a courtesy or aside."
+                ),
             },
             "preference_to_remember": {
                 "type": "string",
@@ -65,9 +71,15 @@ def understand_and_generate(
         f"This user's stated preferences (apply as defaults unless the question says otherwise):\n{preferences_text or '(none)'}\n\n"
         f"Prior thread/recent context:\n{context_text or '(none)'}\n\n"
         f"Question: {question}\n\n"
+        "You only ever answer questions using this game's tracked analytics data via BigQuery — "
+        "never from your own general knowledge, and never about anything unrelated to this data "
+        "(math, general trivia, other topics). "
         "Decide: does this map to a plausible query against this schema (match), "
-        "is it clearly unanswerable because the needed event/param doesn't exist (refusal), "
+        "is it clearly unanswerable because the needed event/param doesn't exist, or because the "
+        "question is off-topic for this bot entirely (refusal), "
         "or is there no plausible mapping at all so you should ask for clarification (clarify)? "
+        "If refusing an off-topic question, say only that it's out of scope — do not go on to "
+        "actually answer it. "
         "Also decide whether the message states a durable preference this user wants remembered "
         "for future questions — if so, set preference_to_remember as well. "
         f"If you generate SQL, the FROM clause must reference exactly {table_ref} — this is the "

@@ -79,3 +79,23 @@ def test_ordinary_question_states_no_preference_to_remember():
         "how many players started level 3", FLOOD_IT_SCHEMA, [], [], _DATASET_PATH, _client()
     )
     assert result.preference_to_remember is None
+
+
+def test_off_topic_math_question_is_refused_not_answered():
+    # Regression test: this used to refuse *and then answer anyway* ("The answer is 4!"),
+    # using Claude's own general knowledge instead of staying grounded in the game data —
+    # first caught during a live end-to-end run.
+    result = understand_and_generate("what's 2 + 2?", FLOOD_IT_SCHEMA, [], [], _DATASET_PATH, _client())
+    assert result.outcome == QuestionOutcome.REFUSAL
+    assert result.message
+    assert "4" not in result.message
+
+
+def test_off_topic_trivia_question_is_refused_not_answered():
+    # Same failure mode as above, for general-knowledge trivia ("The capital of India is New Delhi").
+    result = understand_and_generate(
+        "what is the capital of India?", FLOOD_IT_SCHEMA, [], [], _DATASET_PATH, _client()
+    )
+    assert result.outcome == QuestionOutcome.REFUSAL
+    assert result.message
+    assert "delhi" not in result.message.lower()
