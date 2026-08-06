@@ -10,3 +10,4 @@ analystbot.db
 *-key.json
 service-account*.json
 credentials.json
+bot.log
