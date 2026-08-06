@@ -24,10 +24,13 @@ def is_significant(count_a: int, n_a: int, count_b: int, n_b: int, z_threshold: 
 def _row_count_total(row: dict) -> tuple[int, int] | None:
     """Read a (count, total) pair out of one result row, or None if it isn't that shape.
 
-    A row qualifies when it carries exactly two non-negative integer columns. If one is
-    named like a denominator ("total", "sample", ...) it is taken as the total;
-    otherwise the larger value is. Rows with a count above the total are rejected —
-    that's not a rate, so treating it as one would produce a nonsense claim.
+    A row qualifies only when it carries exactly two non-negative integer columns AND one
+    of them is named like an actual denominator ("total", "sample", ...). There is no
+    fallback that guesses count/total from relative magnitude alone — two arbitrary int
+    columns (e.g. a `level_number`/`day` label next to an unrelated count) are NOT a
+    count/total pair just because one happens to be smaller, and treating them as one
+    would fabricate a statistic about numbers that were never a rate. Rows with a count
+    above the total are also rejected — that's not a rate either.
     """
     ints = [
         (key, value)
@@ -38,12 +41,10 @@ def _row_count_total(row: dict) -> tuple[int, int] | None:
         return None
 
     total_key = next((k for k, _ in ints if any(hint in k.lower() for hint in _TOTAL_HINTS)), None)
-    if total_key is not None:
-        total = next(v for k, v in ints if k == total_key)
-        count = next(v for k, v in ints if k != total_key)
-    else:
-        (_, first), (_, second) = ints
-        count, total = (first, second) if first <= second else (second, first)
+    if total_key is None:
+        return None
+    total = next(v for k, v in ints if k == total_key)
+    count = next(v for k, v in ints if k != total_key)
 
     if total == 0 or count > total:
         return None

@@ -52,3 +52,17 @@ def test_count_above_total_is_not_treated_as_a_rate():
 
 def test_empty_result_is_not_a_comparison():
     assert significance_note([]) is None
+
+
+def test_label_like_columns_are_not_mistaken_for_a_count_total_pair():
+    # level_number is a label, not a denominator — treating (level_number, n) as
+    # (total, count) by magnitude alone fabricates a rate out of unrelated numbers.
+    rows = [{"level_number": 1, "n": 500}, {"level_number": 2, "n": 400}]
+    assert significance_note(rows) is None
+
+
+def test_day_and_retained_columns_are_not_mistaken_for_a_count_total_pair():
+    # day is a label (day 1, day 7), not a denominator for `retained` — same fabrication
+    # shape as level_number/n above, just with different column names.
+    rows = [{"day": 1, "retained": 3600}, {"day": 7, "retained": 1200}]
+    assert significance_note(rows) is None
