@@ -1,3 +1,5 @@
+import asyncio
+
 from analystbot.query.schema_discovery import discover_schema
 from analystbot.storage import schema_cache
 
@@ -16,7 +18,10 @@ def build_onboarding_report(schema: dict) -> str:
 
 
 async def run_onboarding(message, backend, dataset_path: str, conn) -> str:
-    schema = discover_schema(backend, dataset_path)
+    # discover_schema runs two full-wildcard BigQuery scans; off the event loop it goes,
+    # or the gateway heartbeat stalls for as long as they take. The SQLite write stays
+    # on this thread (thread-affine connection).
+    schema = await asyncio.to_thread(discover_schema, backend, dataset_path)
     schema_cache.save_schema(conn, schema)
     report = build_onboarding_report(schema)
     await message.channel.send(report)

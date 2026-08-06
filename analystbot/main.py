@@ -1,3 +1,4 @@
+import asyncio
 import os
 from datetime import date, timedelta
 import discord
@@ -94,7 +95,10 @@ def main() -> None:
         today = date.today()
         suffix_end = today.strftime("%Y%m%d")
         suffix_start = (today - timedelta(days=6)).strftime("%Y%m%d")
-        current_metrics = query_weekly_metrics(bot.backend, config.bq_dataset_path, list(schema["events"].keys()), suffix_start, suffix_end)
+        current_metrics = await asyncio.to_thread(
+            query_weekly_metrics,
+            bot.backend, config.bq_dataset_path, list(schema["events"].keys()), suffix_start, suffix_end,
+        )
         result = run_digest(bot.conn, today.isoformat(), current_metrics)
         await channel.send(result.summary)
 

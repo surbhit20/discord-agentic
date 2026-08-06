@@ -47,14 +47,16 @@ def query_weekly_metrics(backend, dataset_path: str, events: list[str], suffix_s
     """
     total = backend.execute(total_sql)[0]["n"]
 
-    metrics: dict[str, tuple[int, int]] = {}
-    for event_name in events:
-        count_sql = f"""
-            SELECT COUNT(DISTINCT user_pseudo_id) AS n
-            FROM `{dataset_path}.events_*`
-            WHERE _TABLE_SUFFIX BETWEEN '{suffix_start}' AND '{suffix_end}'
-              AND event_name = '{event_name}'
-        """
-        count = backend.execute(count_sql)[0]["n"]
-        metrics[event_name] = (count, total)
-    return metrics
+    # One grouped query for every event, not one query per event: the digest previously
+    # issued 1+N serial BigQuery jobs, which is both slow and needlessly expensive.
+    per_event_sql = f"""
+        SELECT event_name, COUNT(DISTINCT user_pseudo_id) AS n
+        FROM `{dataset_path}.events_*`
+        WHERE _TABLE_SUFFIX BETWEEN '{suffix_start}' AND '{suffix_end}'
+        GROUP BY event_name
+    """
+    counts = {row["event_name"]: row["n"] for row in backend.execute(per_event_sql)}
+
+    # Events that fired zero times in the window are absent from the grouped result;
+    # they still belong in the digest as (0, total).
+    return {event_name: (counts.get(event_name, 0), total) for event_name in events}
