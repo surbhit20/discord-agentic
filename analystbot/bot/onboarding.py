@@ -80,21 +80,39 @@ def find_schema_gaps(events: dict) -> list[str]:
     return gaps[:_MAX_GAPS]
 
 
+def _format_date(yyyymmdd: str) -> str:
+    """`20180612` -> `2018-06-12`; passes through anything not in that exact shape."""
+    if len(yyyymmdd) == 8 and yyyymmdd.isdigit():
+        return f"{yyyymmdd[:4]}-{yyyymmdd[4:6]}-{yyyymmdd[6:8]}"
+    return yyyymmdd
+
+
 def build_onboarding_report(schema: dict) -> str:
     events = schema["events"]
     tracked = ", ".join(sorted(events.keys()))
     min_date, max_date = schema["date_range"]
+    player_count = schema["player_count"]
+
     lines = [
-        f"Tracking {len(events)} event types: {tracked}.",
-        f"Data covers {min_date} to {max_date}, {schema['player_count']} players.",
+        "**Setup complete — here's what I found**",
+        "",
+        f"**{player_count:,} players**, tracked from **{_format_date(min_date)}** to **{_format_date(max_date)}**.",
+        "",
+        f"**{len(events)} event types tracked:**",
+        f"```\n{tracked}\n```",
     ]
+
     gaps = find_schema_gaps(events)
     if gaps:
-        lines.append("Notable gaps:")
+        lines.append("")
+        lines.append("**⚠️ Notable gaps:**")
         lines.extend(f"- {gap}" for gap in gaps)
+
+    lines.append("")
     lines.append(
-        "Reply with `confirm` (mentioning me, since that's the only way I hear you outside my own "
-        "threads) to start using this data, or correct me if something looks wrong."
+        "**Next step:** reply with `confirm` (make sure to @-mention me, since that's the only way "
+        "I hear you outside my own threads) to start using this data, or tell me if something above "
+        "looks wrong."
     )
     return "\n".join(lines)
 

@@ -11,8 +11,8 @@ def test_report_includes_event_count_date_range_and_player_count():
     assert "2 event types" in report
     assert "level_start" in report
     assert "session_start" in report
-    assert "20180101" in report and "20180419" in report
-    assert "5000 players" in report
+    assert "2018-01-01" in report and "2018-04-19" in report
+    assert "5,000 players" in report
     assert "confirm" in report
 
 
