@@ -13,6 +13,7 @@ class Config:
     bq_dataset_path: str
     google_application_credentials: str
     cost_threshold_bytes: int
+    bq_price_per_tib_usd: float
     db_path: str
 
 
@@ -36,5 +37,8 @@ def load_config(env: dict[str, str]) -> Config:
         bq_dataset_path=env["BQ_DATASET_PATH"],
         google_application_credentials=env["GOOGLE_APPLICATION_CREDENTIALS"],
         cost_threshold_bytes=int(env.get("COST_THRESHOLD_BYTES", str(1024 ** 3))),
+        # BigQuery on-demand pricing as of this writing; override if your project is on a
+        # different tier/region or the published rate changes.
+        bq_price_per_tib_usd=float(env.get("BQ_PRICE_PER_TIB_USD", "6.25")),
         db_path=env.get("DB_PATH", "analystbot.db"),
     )
