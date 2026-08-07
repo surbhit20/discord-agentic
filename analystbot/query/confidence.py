@@ -15,7 +15,16 @@ _TOOL = {
         "type": "object",
         "properties": {
             "confident": {"type": "boolean"},
-            "reason": {"type": "string", "description": "Required when confident is false: what's uncertain"},
+            "reason": {
+                "type": "string",
+                "description": (
+                    "Required when confident is false. Hard limit: one plain-English clause, "
+                    "under 15 words, no jargon, no semicolons/lists — pick the single biggest "
+                    "uncertainty and drop the rest. Good: 'I guessed which event means a level "
+                    "finished.' Bad: a paragraph listing every assumption about columns, types, "
+                    "and table names."
+                ),
+            },
         },
         "required": ["confident"],
     },
@@ -26,7 +35,9 @@ def score_confidence(question: str, sql: str, client: anthropic.Anthropic) -> Co
     prompt = (
         f"Question: {question}\nGenerated SQL: {sql}\n\n"
         "Rate whether you're confident this SQL correctly answers the question, "
-        "or whether you made an uncertain assumption (e.g. about which event/param was meant)."
+        "or whether you made an uncertain assumption (e.g. about which event/param was meant). "
+        "If not confident, give the reason as one short clause a non-technical teammate could "
+        "read in passing — not a technical breakdown of every assumption."
     )
     response = client.messages.create(
         model="claude-sonnet-5",

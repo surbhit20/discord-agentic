@@ -27,3 +27,19 @@ def test_not_confident_when_sql_makes_a_guessy_assumption():
     )
     assert result.confident is False
     assert result.reason
+
+
+def test_low_confidence_reason_is_short_and_plain_english():
+    # Regression test: this used to write a full paragraph listing every column/table/type
+    # assumption made — unreadable to anyone without a data background. Caught live when a
+    # vague question ("what is level progression") produced a 4-sentence caution note.
+    sql = (
+        "SELECT level_number, COUNT(DISTINCT user_pseudo_id) AS starts, "
+        "COUNTIF(event_name = 'level_complete') AS completes "
+        "FROM events WHERE event_name IN ('level_start', 'level_complete') GROUP BY level_number"
+    )
+    result = score_confidence("what is level progression", sql, _client())
+    assert result.confident is False
+    assert result.reason
+    assert len(result.reason.split()) <= 20
+    assert ";" not in result.reason
