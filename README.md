@@ -67,6 +67,7 @@ python -m analystbot.main
 | `BQ_DATASET_PATH` | yes | Fully-qualified `project.dataset` to query, e.g. `firebase-public-project.analytics_153293282` |
 | `GOOGLE_APPLICATION_CREDENTIALS` | yes | Path to a service account key JSON file |
 | `COST_THRESHOLD_BYTES` | no | Bytes-scanned threshold above which a query asks for confirmation (default 1 GiB) |
+| `BQ_PRICE_PER_TIB_USD` | no | Price per TiB scanned, used to show an estimated dollar cost in cost warnings (default `6.25`, BigQuery's on-demand rate — override for your actual pricing tier/region) |
 | `DB_PATH` | no | SQLite file path (default `analystbot.db`) |
 | `LOG_LEVEL` | no | Python logging level (default `INFO`) |
 

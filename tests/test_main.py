@@ -73,6 +73,7 @@ def _config(db_path: str = ":memory:") -> Config:
         bq_dataset_path="firebase-public-project.analytics_153293282",
         google_application_credentials="/tmp/creds.json",
         cost_threshold_bytes=1000,
+        bq_price_per_tib_usd=6.25,
         db_path=db_path,
     )
 

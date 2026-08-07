@@ -16,6 +16,22 @@ def test_format_caution_appends_reason_after_answer():
 
 
 def test_format_cost_warning_converts_bytes_to_gb_and_asks_to_confirm():
-    msg = format_cost_warning(2 * 1024 ** 3)
+    msg = format_cost_warning(2 * 1024 ** 3, threshold_bytes=1024 ** 3, price_per_tib_usd=6.25)
     assert "2.00 GB" in msg
     assert "confirm" in msg
+
+
+def test_format_cost_warning_includes_estimated_dollar_cost():
+    # 2 GiB at $6.25/TiB = 2/1024 TiB * 6.25 ≈ $0.0122
+    msg = format_cost_warning(2 * 1024 ** 3, threshold_bytes=1024 ** 3, price_per_tib_usd=6.25)
+    assert "$0.0122" in msg
+
+
+def test_format_cost_warning_includes_multiple_of_threshold():
+    msg = format_cost_warning(2 * 1024 ** 3, threshold_bytes=1024 ** 3, price_per_tib_usd=6.25)
+    assert "2.0x" in msg
+
+
+def test_format_cost_warning_mentions_the_free_tier():
+    msg = format_cost_warning(2 * 1024 ** 3, threshold_bytes=1024 ** 3, price_per_tib_usd=6.25)
+    assert "free" in msg.lower()

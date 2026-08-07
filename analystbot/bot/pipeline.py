@@ -114,7 +114,7 @@ async def answer_question(
             # Park the exact SQL so a `confirm` reply in this thread runs *this* query
             # rather than regenerating it and hitting the same threshold forever.
             thread_store.save_pending_query(conn, thread_id, question, result.sql)
-        return format_cost_warning(bytes_estimate), result.sql
+        return format_cost_warning(bytes_estimate, deps.cost_threshold_bytes, deps.price_per_tib_usd), result.sql
 
     return await _execute_and_format(question, result.sql, deps), result.sql
 

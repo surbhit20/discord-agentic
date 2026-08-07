@@ -50,6 +50,7 @@ async def test_expensive_query_returns_cost_warning_without_executing(monkeypatc
     deps = SimpleNamespace(
         backend=MagicMock(dry_run=MagicMock(return_value=10_000_000_000)),
         schema={}, dataset_path=_DATASET_PATH, anthropic_client=MagicMock(), cost_threshold_bytes=1000,
+        price_per_tib_usd=6.25,
     )
     reply, sql = await pipeline.answer_question("how many players ever", 1, [], [], deps)
     assert "confirm" in reply
@@ -110,6 +111,7 @@ def _deps(conn=None, **overrides):
         dataset_path=_DATASET_PATH,
         anthropic_client=MagicMock(),
         cost_threshold_bytes=1000,
+        price_per_tib_usd=6.25,
         conn=conn,
     )
     base.update(overrides)

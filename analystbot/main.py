@@ -103,6 +103,7 @@ def build_bot(*, config: Config, conn, backend, anthropic_client) -> AnalystBot:
             dataset_path=config.bq_dataset_path,
             anthropic_client=anthropic_client,
             cost_threshold_bytes=config.cost_threshold_bytes,
+            price_per_tib_usd=config.bq_price_per_tib_usd,
             conn=conn,
         )
 
